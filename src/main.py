@@ -12,6 +12,7 @@ from src.models import *
 parser = argparse.ArgumentParser(description='pytorch version of GraphSAGE')
 
 parser.add_argument('--dataSet', type=str, default='cora')
+parser.add_argument('--agg_func', type=str, default='MEAN')
 parser.add_argument('--epochs', type=int, default=200)
 parser.add_argument('--b_sz', type=int, default=50)
 parser.add_argument('--seed', type=int, default=824)
@@ -48,7 +49,7 @@ if __name__ == '__main__':
 	features = torch.FloatTensor(getattr(dataCenter, ds+'_feats')).to(device)
 	print(features.size())
 
-	graphSage = GraphSage(config['setting.num_layers'], features.size(1), config['setting.hidden_emb_size'], features, getattr(dataCenter, ds+'_adj_lists'), device, gcn=args.gcn)
+	graphSage = GraphSage(config['setting.num_layers'], features.size(1), config['setting.hidden_emb_size'], features, getattr(dataCenter, ds+'_adj_lists'), device, gcn=args.gcn, agg_func=args.agg_func)
 	graphSage.to(device)
 
 	num_labels = len(set(getattr(dataCenter, ds+'_labels')))

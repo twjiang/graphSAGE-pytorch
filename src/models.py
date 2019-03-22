@@ -31,6 +31,7 @@ class SageLayer(nn.Module):
 		self.input_size = input_size
 		self.out_size = out_size
 
+
 		self.gcn = gcn
 		self.weight = nn.Parameter(torch.FloatTensor(out_size, self.input_size if self.gcn else 2 * self.input_size))
 
@@ -55,7 +56,7 @@ class SageLayer(nn.Module):
 
 class GraphSage(nn.Module):
 	"""docstring for GraphSage"""
-	def __init__(self, num_layers, input_size, out_size, raw_features, adj_lists, device, gcn=False):
+	def __init__(self, num_layers, input_size, out_size, raw_features, adj_lists, device, gcn=False, agg_func='MEAN'):
 		super(GraphSage, self).__init__()
 
 		self.input_size = input_size
@@ -63,6 +64,7 @@ class GraphSage(nn.Module):
 		self.num_layers = num_layers
 		self.gcn = gcn
 		self.device = device
+		self.agg_func = agg_func
 
 		self.raw_features = raw_features
 		self.adj_lists = adj_lists
@@ -145,15 +147,21 @@ class GraphSage(nn.Module):
 		num_neigh = mask.sum(1, keepdim=True)
 		# print(mask)
 		indexs = [x.nonzero() for x in mask==1]
-		print(indexs)
-		outputs = []
+		aggregate_feats = []
 		for feat in [embed_matrix[x.squeeze()] for x in indexs]:
 			if len(feat.size()) == 1:
-				outputs.append(feat)
+				aggregate_feats.append(feat.view(1, -1))
 			else:
-				outputs.append(torch.mean(feat,0))
+				if self.agg_func == 'MEAN':
+					aggregate_feats.append(torch.mean(feat,0).view(1, -1))
+				elif self.agg_func == 'MAX':
+					aggregate_feats.append(torch.max(feat,0)[0].view(1, -1))
+		aggregate_feats = torch.cat(aggregate_feats, 0)
 
-		mask = mask.div(num_neigh).to(self.device)
-		aggregate_feats = mask.mm(embed_matrix)
-		print(aggregate_feats.size())
+		# mask = mask.div(num_neigh).to(self.device)
+		# aggregate_feats = mask.mm(embed_matrix)
+		# print(aggregate_feats.size())
+		# assert len(outputs) == len(aggregate_feats)
+		# for i, output in enumerate(outputs):
+		# 	print(aggregate_feats[i] - output)
 		return aggregate_feats

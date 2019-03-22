@@ -31,6 +31,15 @@ def evaluate(dataCenter, ds, graphSage, classification, b_sz, device):
 
 	print("Validation F1:", f1_score(labels_val, predicts.cpu().data, average="micro"))
 
+	embs = graphSage(test_nodes)
+	logists = classification(embs)
+	_, predicts = torch.max(logists, 1)
+	labels_test = labels[test_nodes]
+	assert len(labels_test) == len(predicts)
+	comps = zip(labels_test, predicts.data)
+
+	print("Test F1:", f1_score(labels_test, predicts.cpu().data, average="micro"))
+
 	for param in params:
 		param.requires_grad = True
 
@@ -57,7 +66,7 @@ def apply_model(dataCenter, ds, graphSage, classification, b_sz, device):
 		model.zero_grad()
 
 	batches = math.ceil(len(train_nodes) / b_sz)
-	
+
 	for index in range(batches):
 		nodes_batch = train_nodes[index*b_sz:(index+1)*b_sz]
 		labels_batch = labels[nodes_batch]
