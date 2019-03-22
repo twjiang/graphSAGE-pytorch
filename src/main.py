@@ -17,6 +17,8 @@ parser.add_argument('--b_sz', type=int, default=50)
 parser.add_argument('--seed', type=int, default=824)
 parser.add_argument('--cuda', action='store_true',
 					help='use CUDA')
+parser.add_argument('--gcn', action='store_true',
+					help='use CUDA')
 parser.add_argument('--config', type=str, default='./src/experiments.conf')
 args = parser.parse_args()
 
@@ -46,7 +48,7 @@ if __name__ == '__main__':
 	features = torch.FloatTensor(getattr(dataCenter, ds+'_feats')).to(device)
 	print(features.size())
 
-	graphSage = GraphSage(config['setting.num_layers'], features.size(1), config['setting.hidden_emb_size'], features, getattr(dataCenter, ds+'_adj_lists'), device)
+	graphSage = GraphSage(config['setting.num_layers'], features.size(1), config['setting.hidden_emb_size'], features, getattr(dataCenter, ds+'_adj_lists'), device, gcn=args.gcn)
 	graphSage.to(device)
 
 	num_labels = len(set(getattr(dataCenter, ds+'_labels')))

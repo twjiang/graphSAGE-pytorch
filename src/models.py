@@ -69,7 +69,7 @@ class GraphSage(nn.Module):
 
 		for index in range(1, num_layers+1):
 			layer_size = out_size if index != 1 else input_size
-			setattr(self, 'sage_layer'+str(index), SageLayer(layer_size, out_size))
+			setattr(self, 'sage_layer'+str(index), SageLayer(layer_size, out_size, gcn=self.gcn))
 
 	def forward(self, nodes_batch):
 		"""
@@ -129,7 +129,8 @@ class GraphSage(nn.Module):
 		assert len(nodes) == len(samp_neighs)
 		indicator = [(nodes[i] in samp_neighs[i]) for i in range(len(samp_neighs))]
 		assert (False not in indicator)
-		samp_neighs = [(samp_neighs[i]-set([nodes[i]])) for i in range(len(samp_neighs))]
+		if not self.gcn:
+			samp_neighs = [(samp_neighs[i]-set([nodes[i]])) for i in range(len(samp_neighs))]
 
 		if len(pre_hidden_embs) == len(unique_nodes_list):
 			embed_matrix = pre_hidden_embs
@@ -137,11 +138,22 @@ class GraphSage(nn.Module):
 			embed_matrix = pre_hidden_embs[torch.LongTensor(unique_nodes_list)]
 
 		mask = torch.zeros(len(samp_neighs), len(unique_nodes))
-		column_indices = [unique_nodes[n] for samp_neigh in samp_neighs for n in samp_neigh]   
+		column_indices = [unique_nodes[n] for samp_neigh in samp_neighs for n in samp_neigh]
 		row_indices = [i for i in range(len(samp_neighs)) for j in range(len(samp_neighs[i]))]
 		mask[row_indices, column_indices] = 1
 
 		num_neigh = mask.sum(1, keepdim=True)
+		# print(mask)
+		indexs = [x.nonzero() for x in mask==1]
+		print(indexs)
+		outputs = []
+		for feat in [embed_matrix[x.squeeze()] for x in indexs]:
+			if len(feat.size()) == 1:
+				outputs.append(feat)
+			else:
+				outputs.append(torch.mean(feat,0))
+
 		mask = mask.div(num_neigh).to(self.device)
 		aggregate_feats = mask.mm(embed_matrix)
+		print(aggregate_feats.size())
 		return aggregate_feats

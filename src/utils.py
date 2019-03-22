@@ -1,6 +1,8 @@
 import sys
 import os
 import torch
+import random
+import math
 
 from sklearn.utils import shuffle
 from sklearn.metrics import f1_score
@@ -27,7 +29,7 @@ def evaluate(dataCenter, ds, graphSage, classification, b_sz, device):
 	assert len(labels_val) == len(predicts)
 	comps = zip(labels_val, predicts.data)
 
-	print("Validation F1:", f1_score(labels_val, predicts.data, average="micro"))
+	print("Validation F1:", f1_score(labels_val, predicts.cpu().data, average="micro"))
 
 	for param in params:
 		param.requires_grad = True
@@ -54,8 +56,8 @@ def apply_model(dataCenter, ds, graphSage, classification, b_sz, device):
 	for model in models:
 		model.zero_grad()
 
-	batches = len(train_nodes) // b_sz
-	batches = (batches + 1) if len(train_nodes) % b_sz != 0 else batches
+	batches = math.ceil(len(train_nodes) / b_sz)
+	
 	for index in range(batches):
 		nodes_batch = train_nodes[index*b_sz:(index+1)*b_sz]
 		labels_batch = labels[nodes_batch]
@@ -72,6 +74,25 @@ def apply_model(dataCenter, ds, graphSage, classification, b_sz, device):
 		optimizer.zero_grad()
 		for model in models:
 			model.zero_grad()
+
+N_WALKS = 10
+WALK_LEN = 10
+def run_random_walks(G, nodes, num_walks=N_WALKS):
+	pairs = []
+	for count, node in enumerate(nodes):
+		if G.degree(node) == 0:
+			continue
+		for i in range(num_walks):
+			curr_node = node
+			for j in range(WALK_LEN):
+				next_node = random.choice(G.neighbors(curr_node))
+				# self co-occurrences are useless
+				if curr_node != node:
+					pairs.append((node,curr_node))
+				curr_node = next_node
+		if count % 1000 == 0:
+			print("Done walks for", count, "nodes")
+	return pairs
 
 # def run_cora(device, dataCenter, data):
 # 	feat_data, labels, adj_lists = data
