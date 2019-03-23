@@ -6,7 +6,9 @@ import math
 
 from sklearn.utils import shuffle
 from sklearn.metrics import f1_score
+
 import torch.nn as nn
+import numpy as np
 
 def evaluate(dataCenter, ds, graphSage, classification, b_sz, device):
 	test_nodes = getattr(dataCenter, ds+'_test')
@@ -43,7 +45,7 @@ def evaluate(dataCenter, ds, graphSage, classification, b_sz, device):
 	for param in params:
 		param.requires_grad = True
 
-def apply_model(dataCenter, ds, graphSage, classification, b_sz, device):
+def apply_model(dataCenter, ds, graphSage, classification, unsupervised_loss, b_sz, device):
 	test_nodes = getattr(dataCenter, ds+'_test')
 	val_nodes = getattr(dataCenter, ds+'_val')
 	train_nodes = getattr(dataCenter, ds+'_train')
@@ -67,14 +69,17 @@ def apply_model(dataCenter, ds, graphSage, classification, b_sz, device):
 
 	batches = math.ceil(len(train_nodes) / b_sz)
 
+	visited_nodes = set()
 	for index in range(batches):
 		nodes_batch = train_nodes[index*b_sz:(index+1)*b_sz]
+		nodes_batch = np.asarray(list(unsupervised_loss.extend_nodes(nodes_batch)))
+		visited_nodes |= set(nodes_batch)
 		labels_batch = labels[nodes_batch]
 		embs_batch = graphSage(nodes_batch)
 		logists = classification(embs_batch)
 		loss = -torch.sum(logists[range(logists.size(0)), labels_batch], 0)
 		loss /= len(nodes_batch)
-		print(loss.item())
+		print('Step {}, Loss: {:.4f}, Dealed Nodes [{}/{}] '.format(index, loss.item(), len(visited_nodes), len(train_nodes)))
 		loss.backward()
 		for model in models:
 			nn.utils.clip_grad_norm_(model.parameters(), 5)
@@ -84,24 +89,9 @@ def apply_model(dataCenter, ds, graphSage, classification, b_sz, device):
 		for model in models:
 			model.zero_grad()
 
-N_WALKS = 10
-WALK_LEN = 10
-def run_random_walks(G, nodes, num_walks=N_WALKS):
-	pairs = []
-	for count, node in enumerate(nodes):
-		if G.degree(node) == 0:
-			continue
-		for i in range(num_walks):
-			curr_node = node
-			for j in range(WALK_LEN):
-				next_node = random.choice(G.neighbors(curr_node))
-				# self co-occurrences are useless
-				if curr_node != node:
-					pairs.append((node,curr_node))
-				curr_node = next_node
-		if count % 1000 == 0:
-			print("Done walks for", count, "nodes")
-	return pairs
+		if visited_nodes == set(train_nodes):
+			return
+
 
 # def run_cora(device, dataCenter, data):
 # 	feat_data, labels, adj_lists = data

@@ -21,6 +21,66 @@ class Classification(nn.Module):
 		logists = torch.log_softmax(torch.mm(embeds,self.weight), 1)
 		return logists
 
+class UnsupervisedLoss(object):
+	"""docstring for UnsupervisedLoss"""
+	def __init__(self, adj_lists, train_nodes):
+		super(UnsupervisedLoss, self).__init__()
+		self.N_WALKS = 2
+		self.WALK_LEN = 3
+		self.adj_lists = adj_lists
+		self.train_nodes = train_nodes
+
+		self.positive_pairs = []
+		self.negtive_pairs = []
+		self.unique_nodes_batch = []
+
+	def forward(self):
+		pass
+
+	def extend_nodes(self, nodes):
+		self.get_positive_nodes(nodes)
+		# print(self.positive_pairs)
+		self.get_negtive_nodes(nodes)
+		# print(self.negtive_pairs)
+		self.unique_nodes_batch = set([i for x in self.positive_pairs for i in x]) | set([i for x in self.negtive_pairs for i in x])
+		return self.unique_nodes_batch
+
+	def get_positive_nodes(self, nodes):
+		return self._run_random_walks(nodes)
+
+	def get_negtive_nodes(self, nodes):
+		self.negtive_pairs = []
+		for node in nodes:
+			neighbors = set([node])
+			frontier = set([node])
+			for i in range(self.WALK_LEN):
+				current = set()
+				for outer in frontier:
+					current |= self.adj_lists[int(outer)]
+				frontier = current - neighbors
+				neighbors |= current
+			far_nodes = set(self.train_nodes) - neighbors
+			neg_samples = random.sample(far_nodes, self.N_WALKS*self.WALK_LEN) if self.N_WALKS*self.WALK_LEN < len(far_nodes) else far_nodes
+			self.negtive_pairs.extend([(node, neg_node) for neg_node in neg_samples])
+		return self.negtive_pairs
+
+	def _run_random_walks(self, nodes):
+		self.positive_pairs = []
+		for node in nodes:
+			if len(self.adj_lists[int(node)]) == 0:
+				continue
+			for i in range(self.N_WALKS):
+				curr_node = node
+				for j in range(self.WALK_LEN):
+					neighs = self.adj_lists[int(curr_node)]
+					next_node = random.choice(list(neighs))
+					# self co-occurrences are useless
+					if curr_node != node and curr_node in self.train_nodes:
+						self.positive_pairs.append((node,curr_node))
+					curr_node = next_node
+		return self.positive_pairs
+		
+
 class SageLayer(nn.Module):
 	"""
 	Encodes a node's using 'convolutional' GraphSage approach

@@ -14,7 +14,7 @@ parser = argparse.ArgumentParser(description='pytorch version of GraphSAGE')
 parser.add_argument('--dataSet', type=str, default='cora')
 parser.add_argument('--agg_func', type=str, default='MEAN')
 parser.add_argument('--epochs', type=int, default=200)
-parser.add_argument('--b_sz', type=int, default=50)
+parser.add_argument('--b_sz', type=int, default=20)
 parser.add_argument('--seed', type=int, default=824)
 parser.add_argument('--cuda', action='store_true',
 					help='use CUDA')
@@ -56,9 +56,11 @@ if __name__ == '__main__':
 	classification = Classification(config['setting.hidden_emb_size'], num_labels)
 	classification.to(device)
 
+	unsupervised_loss = UnsupervisedLoss(getattr(dataCenter, ds+'_adj_lists'), getattr(dataCenter, ds+'_train'))
+
 	for epoch in range(args.epochs):
 		print('----------------------EPOCH %d-----------------------' % epoch)
-		apply_model(dataCenter, ds, graphSage, classification, args.b_sz, device)
+		apply_model(dataCenter, ds, graphSage, classification, unsupervised_loss, args.b_sz, device)
 		evaluate(dataCenter, ds, graphSage, classification, args.b_sz, device)
 
 
