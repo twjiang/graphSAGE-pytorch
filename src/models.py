@@ -23,37 +23,80 @@ class Classification(nn.Module):
 
 class UnsupervisedLoss(object):
 	"""docstring for UnsupervisedLoss"""
-	def __init__(self, adj_lists, train_nodes):
+	def __init__(self, adj_lists, train_nodes, device):
 		super(UnsupervisedLoss, self).__init__()
 		self.N_WALKS = 2
 		self.WALK_LEN = 3
+		self.N_WALK_LEN = 5
+		self.MARGIN = 3
 		self.adj_lists = adj_lists
 		self.train_nodes = train_nodes
+		self.device = device
 
+		self.target_nodes = None
 		self.positive_pairs = []
 		self.negtive_pairs = []
+		self.node_positive_pairs = {}
+		self.node_negtive_pairs = {}
 		self.unique_nodes_batch = []
 
-	def forward(self):
-		pass
+	def get_loss(self, embeddings, nodes):
+		assert len(embeddings) == len(self.unique_nodes_batch)
+		assert False not in [nodes[i]==self.unique_nodes_batch[i] for i in range(len(nodes))]
+		node2index = {n:i for i,n in enumerate(self.unique_nodes_batch)}
+
+		nodes_score = []
+		assert len(self.node_positive_pairs) == len(self.node_negtive_pairs)
+		for node in self.node_positive_pairs:
+			pps = self.node_positive_pairs[node]
+			nps = self.node_negtive_pairs[node]
+			if len(pps) == 0 or len(nps) == 0:
+				continue
+
+			indexs = [list(x) for x in zip(*pps)]
+			node_index = [node2index[x] for x in indexs[0]]
+			neighb_index = [node2index[x] for x in indexs[1]]
+			pos_score = F.cosine_similarity(embeddings[node_index], embeddings[neighb_index])
+			pos_score, _ = torch.min(torch.sigmoid(pos_score), 0)
+
+			indexs = [list(x) for x in zip(*nps)]
+			node_index = [node2index[x] for x in indexs[0]]
+			neighb_index = [node2index[x] for x in indexs[1]]
+			neg_score = F.cosine_similarity(embeddings[node_index], embeddings[neighb_index])
+			neg_score, _ = torch.max(torch.sigmoid(neg_score), 0)
+
+			nodes_score.append(torch.max(torch.tensor(0.0).to(self.device), neg_score-pos_score+self.MARGIN).view(1,-1))
+
+		loss = torch.mean(torch.cat(nodes_score, 0),0)
+
+		# loss = -torch.log(torch.sigmoid(pos_score))-4*torch.log(torch.sigmoid(-neg_score))
+		
+		return loss
+
 
 	def extend_nodes(self, nodes):
+		self.positive_pairs = []
+		self.node_positive_pairs = {}
+		self.negtive_pairs = []
+		self.node_negtive_pairs = {}
+
+		self.target_nodes = nodes
 		self.get_positive_nodes(nodes)
 		# print(self.positive_pairs)
 		self.get_negtive_nodes(nodes)
 		# print(self.negtive_pairs)
-		self.unique_nodes_batch = set([i for x in self.positive_pairs for i in x]) | set([i for x in self.negtive_pairs for i in x])
+		self.unique_nodes_batch = list(set([i for x in self.positive_pairs for i in x]) | set([i for x in self.negtive_pairs for i in x]))
+		assert set(self.target_nodes) < set(self.unique_nodes_batch)
 		return self.unique_nodes_batch
 
 	def get_positive_nodes(self, nodes):
 		return self._run_random_walks(nodes)
 
 	def get_negtive_nodes(self, nodes):
-		self.negtive_pairs = []
 		for node in nodes:
 			neighbors = set([node])
 			frontier = set([node])
-			for i in range(self.WALK_LEN):
+			for i in range(self.N_WALK_LEN):
 				current = set()
 				for outer in frontier:
 					current |= self.adj_lists[int(outer)]
@@ -62,13 +105,14 @@ class UnsupervisedLoss(object):
 			far_nodes = set(self.train_nodes) - neighbors
 			neg_samples = random.sample(far_nodes, self.N_WALKS*self.WALK_LEN) if self.N_WALKS*self.WALK_LEN < len(far_nodes) else far_nodes
 			self.negtive_pairs.extend([(node, neg_node) for neg_node in neg_samples])
+			self.node_negtive_pairs[node] = [(node, neg_node) for neg_node in neg_samples]
 		return self.negtive_pairs
 
 	def _run_random_walks(self, nodes):
-		self.positive_pairs = []
 		for node in nodes:
 			if len(self.adj_lists[int(node)]) == 0:
 				continue
+			cur_pairs = []
 			for i in range(self.N_WALKS):
 				curr_node = node
 				for j in range(self.WALK_LEN):
@@ -77,7 +121,9 @@ class UnsupervisedLoss(object):
 					# self co-occurrences are useless
 					if curr_node != node and curr_node in self.train_nodes:
 						self.positive_pairs.append((node,curr_node))
+						cur_pairs.append((node,curr_node))
 					curr_node = next_node
+			self.node_positive_pairs[node] = cur_pairs
 		return self.positive_pairs
 		
 

@@ -45,7 +45,7 @@ def evaluate(dataCenter, ds, graphSage, classification, b_sz, device):
 	for param in params:
 		param.requires_grad = True
 
-def apply_model(dataCenter, ds, graphSage, classification, unsupervised_loss, b_sz, device):
+def apply_model(dataCenter, ds, graphSage, classification, unsupervised_loss, b_sz, device, learn_method):
 	test_nodes = getattr(dataCenter, ds+'_test')
 	val_nodes = getattr(dataCenter, ds+'_val')
 	train_nodes = getattr(dataCenter, ds+'_train')
@@ -62,7 +62,7 @@ def apply_model(dataCenter, ds, graphSage, classification, unsupervised_loss, b_
 			if param.requires_grad:
 				params.append(param)
 
-	optimizer = torch.optim.SGD(params, lr=0.1)
+	optimizer = torch.optim.SGD(params, lr=0.7)
 	optimizer.zero_grad()
 	for model in models:
 		model.zero_grad()
@@ -72,13 +72,34 @@ def apply_model(dataCenter, ds, graphSage, classification, unsupervised_loss, b_
 	visited_nodes = set()
 	for index in range(batches):
 		nodes_batch = train_nodes[index*b_sz:(index+1)*b_sz]
+
+		# extend nodes batch for unspervised learning
+		# no conflicts with supervised learning
 		nodes_batch = np.asarray(list(unsupervised_loss.extend_nodes(nodes_batch)))
 		visited_nodes |= set(nodes_batch)
+
+		# get ground-truth for the nodes batch
 		labels_batch = labels[nodes_batch]
+
+		# feed nodes batch to the graphSAGE
+		# returning the nodes embeddings
 		embs_batch = graphSage(nodes_batch)
+
+		# unsupervised learning
+		loss_net = unsupervised_loss.get_loss(embs_batch, nodes_batch)
+
+		# superivsed learning
 		logists = classification(embs_batch)
-		loss = -torch.sum(logists[range(logists.size(0)), labels_batch], 0)
-		loss /= len(nodes_batch)
+		loss_sup = -torch.sum(logists[range(logists.size(0)), labels_batch], 0)
+		loss_sup /= len(nodes_batch)
+
+		if learn_method == 'sup':
+			loss = loss_sup
+		elif learn_method == 'plus_unsup':
+			loss = loss_sup + loss_net
+		else:
+			loss = loss_net
+
 		print('Step [{}/{}], Loss: {:.4f}, Dealed Nodes [{}/{}] '.format(index, batches, loss.item(), len(visited_nodes), len(train_nodes)))
 		loss.backward()
 		for model in models:

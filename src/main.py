@@ -18,8 +18,8 @@ parser.add_argument('--b_sz', type=int, default=20)
 parser.add_argument('--seed', type=int, default=824)
 parser.add_argument('--cuda', action='store_true',
 					help='use CUDA')
-parser.add_argument('--gcn', action='store_true',
-					help='use CUDA')
+parser.add_argument('--gcn', action='store_true')
+parser.add_argument('--learn_method', type=str, default='sup')
 parser.add_argument('--config', type=str, default='./src/experiments.conf')
 args = parser.parse_args()
 
@@ -47,7 +47,6 @@ if __name__ == '__main__':
 	dataCenter = DataCenter(config)
 	dataCenter.load_dataSet(ds)
 	features = torch.FloatTensor(getattr(dataCenter, ds+'_feats')).to(device)
-	print(features.size())
 
 	graphSage = GraphSage(config['setting.num_layers'], features.size(1), config['setting.hidden_emb_size'], features, getattr(dataCenter, ds+'_adj_lists'), device, gcn=args.gcn, agg_func=args.agg_func)
 	graphSage.to(device)
@@ -56,11 +55,18 @@ if __name__ == '__main__':
 	classification = Classification(config['setting.hidden_emb_size'], num_labels)
 	classification.to(device)
 
-	unsupervised_loss = UnsupervisedLoss(getattr(dataCenter, ds+'_adj_lists'), getattr(dataCenter, ds+'_train'))
+	unsupervised_loss = UnsupervisedLoss(getattr(dataCenter, ds+'_adj_lists'), getattr(dataCenter, ds+'_train'), device)
+
+	if args.learn_method == 'sup':
+		print('GraphSage with Supervised Learning')
+	elif args.learn_method == 'plus_unsup':
+		print('GraphSage with Supervised Learning plus Net Unsupervised Learning')
+	else:
+		print('GraphSage with Net Unsupervised Learning')
 
 	for epoch in range(args.epochs):
 		print('----------------------EPOCH %d-----------------------' % epoch)
-		apply_model(dataCenter, ds, graphSage, classification, unsupervised_loss, args.b_sz, device)
+		apply_model(dataCenter, ds, graphSage, classification, unsupervised_loss, args.b_sz, device, args.learn_method)
 		evaluate(dataCenter, ds, graphSage, classification, args.b_sz, device)
 
 
