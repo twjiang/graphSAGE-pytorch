@@ -79,7 +79,7 @@ def apply_model(dataCenter, ds, graphSage, classification, unsupervised_loss, b_
 		logists = classification(embs_batch)
 		loss = -torch.sum(logists[range(logists.size(0)), labels_batch], 0)
 		loss /= len(nodes_batch)
-		print('Step {}, Loss: {:.4f}, Dealed Nodes [{}/{}] '.format(index, loss.item(), len(visited_nodes), len(train_nodes)))
+		print('Step [{}/{}], Loss: {:.4f}, Dealed Nodes [{}/{}] '.format(index, batches, loss.item(), len(visited_nodes), len(train_nodes)))
 		loss.backward()
 		for model in models:
 			nn.utils.clip_grad_norm_(model.parameters(), 5)
