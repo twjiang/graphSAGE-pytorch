@@ -45,13 +45,11 @@ def evaluate(dataCenter, ds, graphSage, classification, b_sz, device):
 	for param in params:
 		param.requires_grad = True
 
-def apply_model(dataCenter, ds, graphSage, classification, unsupervised_loss, b_sz, device, learn_method):
+def apply_model(dataCenter, ds, graphSage, classification, unsupervised_loss, b_sz, device, learn_method, last_epoch):
 	test_nodes = getattr(dataCenter, ds+'_test')
 	val_nodes = getattr(dataCenter, ds+'_val')
 	train_nodes = getattr(dataCenter, ds+'_train')
 	labels = getattr(dataCenter, ds+'_labels')
-
-	print(len(test_nodes), len(val_nodes), len(train_nodes))
 
 	train_nodes = shuffle(train_nodes)
 
@@ -62,6 +60,7 @@ def apply_model(dataCenter, ds, graphSage, classification, unsupervised_loss, b_
 			if param.requires_grad:
 				params.append(param)
 
+	c_optimizer = torch.optim.SGD(classification.parameters(), lr=0.7)
 	optimizer = torch.optim.SGD(params, lr=0.7)
 	optimizer.zero_grad()
 	for model in models:
@@ -85,19 +84,22 @@ def apply_model(dataCenter, ds, graphSage, classification, unsupervised_loss, b_
 		# returning the nodes embeddings
 		embs_batch = graphSage(nodes_batch)
 
-		# unsupervised learning
-		loss_net = unsupervised_loss.get_loss(embs_batch, nodes_batch)
-
-		# superivsed learning
-		logists = classification(embs_batch)
-		loss_sup = -torch.sum(logists[range(logists.size(0)), labels_batch], 0)
-		loss_sup /= len(nodes_batch)
-
 		if learn_method == 'sup':
+			# superivsed learning
+			logists = classification(embs_batch)
+			loss_sup = -torch.sum(logists[range(logists.size(0)), labels_batch], 0)
+			loss_sup /= len(nodes_batch)
 			loss = loss_sup
 		elif learn_method == 'plus_unsup':
+			# superivsed learning
+			logists = classification(embs_batch)
+			loss_sup = -torch.sum(logists[range(logists.size(0)), labels_batch], 0)
+			loss_sup /= len(nodes_batch)
+			# unsuperivsed learning
+			loss_net = unsupervised_loss.get_loss(embs_batch, nodes_batch)
 			loss = loss_sup + loss_net
 		else:
+			loss_net = unsupervised_loss.get_loss(embs_batch, nodes_batch)
 			loss = loss_net
 
 		print('Step [{}/{}], Loss: {:.4f}, Dealed Nodes [{}/{}] '.format(index, batches, loss.item(), len(visited_nodes), len(train_nodes)))
@@ -109,6 +111,17 @@ def apply_model(dataCenter, ds, graphSage, classification, unsupervised_loss, b_
 		optimizer.zero_grad()
 		for model in models:
 			model.zero_grad()
+
+		if learn_method == 'unsup':
+			# train classification, detached from the current graph
+			for k in range(10):
+				logists = classification(embs_batch.detach())
+				loss_sup = -torch.sum(logists[range(logists.size(0)), labels_batch], 0)
+				loss_sup /= len(nodes_batch)
+				loss_sup.backward()
+				nn.utils.clip_grad_norm_(classification.parameters(), 5)
+				c_optimizer.step()
+				c_optimizer.zero_grad()
 
 		if visited_nodes == set(train_nodes):
 			return

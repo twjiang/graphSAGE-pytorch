@@ -41,7 +41,6 @@ class DataCenter(object):
 					adj_lists[paper2].add(paper1)
 
 			assert len(feat_data) == len(labels) == len(adj_lists)
-			print(feat_data.shape)
 			test_indexs, val_indexs, train_indexs = self._split_data(feat_data.shape[0])
 
 			setattr(self, dataSet+'_test', test_indexs)
