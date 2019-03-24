@@ -66,13 +66,9 @@ if __name__ == '__main__':
 
 	for epoch in range(args.epochs):
 		print('----------------------EPOCH %d-----------------------' % epoch)
-		if epoch == args.epochs - 1:
-			last_epoch = True
-		else:
-			last_epoch = False
-		graphSage, classification = apply_model(dataCenter, ds, graphSage, classification, unsupervised_loss, args.b_sz, device, args.learn_method, last_epoch)
-		if args.learn_method == 'unsup':
-		 	classification = train_classification(dataCenter, graphSage, classification, ds)
-		evaluate(dataCenter, ds, graphSage, classification, args.b_sz, device)
+		graphSage, classification = apply_model(dataCenter, ds, graphSage, classification, unsupervised_loss, args.b_sz, device, args.learn_method)
+		if (epoch+1) % 2 == 0 and args.learn_method == 'unsup':
+		 	classification = train_classification(dataCenter, graphSage, classification, ds, device)
+		#evaluate(dataCenter, ds, graphSage, classification, device)
 
 

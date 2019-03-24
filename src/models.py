@@ -46,8 +46,8 @@ class UnsupervisedLoss(object):
 	"""docstring for UnsupervisedLoss"""
 	def __init__(self, adj_lists, train_nodes, device):
 		super(UnsupervisedLoss, self).__init__()
-		self.N_WALKS = 2
-		self.WALK_LEN = 3
+		self.N_WALKS = 6
+		self.WALK_LEN = 1
 		self.N_WALK_LEN = 5
 		self.MARGIN = 3
 		self.adj_lists = adj_lists
@@ -87,6 +87,7 @@ class UnsupervisedLoss(object):
 			neg_score, _ = torch.max(torch.log(torch.sigmoid(neg_score)), 0)
 
 			nodes_score.append(torch.max(torch.tensor(0.0).to(self.device), neg_score-pos_score+self.MARGIN).view(1,-1))
+			# nodes_score.append((-pos_score - neg_score).view(1,-1))
 
 		loss = torch.mean(torch.cat(nodes_score, 0),0)
 
@@ -140,10 +141,11 @@ class UnsupervisedLoss(object):
 					neighs = self.adj_lists[int(curr_node)]
 					next_node = random.choice(list(neighs))
 					# self co-occurrences are useless
-					if curr_node != node and curr_node in self.train_nodes:
-						self.positive_pairs.append((node,curr_node))
-						cur_pairs.append((node,curr_node))
+					if next_node != node and next_node in self.train_nodes:
+						self.positive_pairs.append((node,next_node))
+						cur_pairs.append((node,next_node))
 					curr_node = next_node
+
 			self.node_positive_pairs[node] = cur_pairs
 		return self.positive_pairs
 		

@@ -10,7 +10,7 @@ from sklearn.metrics import f1_score
 import torch.nn as nn
 import numpy as np
 
-def evaluate(dataCenter, ds, graphSage, classification, b_sz, device):
+def evaluate(dataCenter, ds, graphSage, classification, device):
 	test_nodes = getattr(dataCenter, ds+'_test')
 	val_nodes = getattr(dataCenter, ds+'_val')
 	labels = getattr(dataCenter, ds+'_labels')
@@ -45,12 +45,12 @@ def evaluate(dataCenter, ds, graphSage, classification, b_sz, device):
 	for param in params:
 		param.requires_grad = True
 
-def train_classification(dataCenter, graphSage, classification, ds, epochs=200):
+def train_classification(dataCenter, graphSage, classification, ds, device, epochs=800):
 	print('Training Classification ...')
 	c_optimizer = torch.optim.SGD(classification.parameters(), lr=0.5)
 	# train classification, detached from the current graph
 	#classification.init_params()
-	b_sz = 1000
+	b_sz = 50
 	for epoch in range(epochs):
 		train_nodes = getattr(dataCenter, ds+'_train')
 		labels = getattr(dataCenter, ds+'_labels')
@@ -63,7 +63,7 @@ def train_classification(dataCenter, graphSage, classification, ds, epochs=200):
 			labels_batch = labels[nodes_batch]
 			embs_batch = graphSage(nodes_batch)
 
-			logists = classification(embs_batch.detach())
+			logists = classification(embs_batch)
 			loss = -torch.sum(logists[range(logists.size(0)), labels_batch], 0)
 			loss /= len(nodes_batch)
 			print('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}, Dealed Nodes [{}/{}] '.format(epoch, epochs, index, batches, loss.item(), len(visited_nodes), len(train_nodes)))
@@ -73,9 +73,11 @@ def train_classification(dataCenter, graphSage, classification, ds, epochs=200):
 			nn.utils.clip_grad_norm_(classification.parameters(), 5)
 			c_optimizer.step()
 			c_optimizer.zero_grad()
+
+		evaluate(dataCenter, ds, graphSage, classification, device)
 	return classification
 
-def apply_model(dataCenter, ds, graphSage, classification, unsupervised_loss, b_sz, device, learn_method, last_epoch):
+def apply_model(dataCenter, ds, graphSage, classification, unsupervised_loss, b_sz, device, learn_method):
 	test_nodes = getattr(dataCenter, ds+'_test')
 	val_nodes = getattr(dataCenter, ds+'_val')
 	train_nodes = getattr(dataCenter, ds+'_train')
