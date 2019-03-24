@@ -70,9 +70,9 @@ if __name__ == '__main__':
 			last_epoch = True
 		else:
 			last_epoch = False
-		apply_model(dataCenter, ds, graphSage, classification, unsupervised_loss, args.b_sz, device, args.learn_method, last_epoch)
-		# if not last_epoch and args.learn_method == 'unsup':
-		# 	print('DO NOT worry the following the performance, we have not trained the classification model. We will do it in the LAST EPOCH.')
+		graphSage, classification = apply_model(dataCenter, ds, graphSage, classification, unsupervised_loss, args.b_sz, device, args.learn_method, last_epoch)
+		if args.learn_method == 'unsup':
+		 	classification = train_classification(dataCenter, graphSage, classification, ds)
 		evaluate(dataCenter, ds, graphSage, classification, args.b_sz, device)
 
 

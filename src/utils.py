@@ -45,6 +45,36 @@ def evaluate(dataCenter, ds, graphSage, classification, b_sz, device):
 	for param in params:
 		param.requires_grad = True
 
+def train_classification(dataCenter, graphSage, classification, ds, epochs=200):
+	print('Training Classification ...')
+	c_optimizer = torch.optim.SGD(classification.parameters(), lr=0.5)
+	# train classification, detached from the current graph
+	#classification.init_params()
+	b_sz = 1000
+	for epoch in range(epochs):
+		train_nodes = getattr(dataCenter, ds+'_train')
+		labels = getattr(dataCenter, ds+'_labels')
+		train_nodes = shuffle(train_nodes)
+		batches = math.ceil(len(train_nodes) / b_sz)
+		visited_nodes = set()
+		for index in range(batches):
+			nodes_batch = train_nodes[index*b_sz:(index+1)*b_sz]
+			visited_nodes |= set(nodes_batch)
+			labels_batch = labels[nodes_batch]
+			embs_batch = graphSage(nodes_batch)
+
+			logists = classification(embs_batch.detach())
+			loss = -torch.sum(logists[range(logists.size(0)), labels_batch], 0)
+			loss /= len(nodes_batch)
+			print('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}, Dealed Nodes [{}/{}] '.format(epoch, epochs, index, batches, loss.item(), len(visited_nodes), len(train_nodes)))
+
+			loss.backward()
+			
+			nn.utils.clip_grad_norm_(classification.parameters(), 5)
+			c_optimizer.step()
+			c_optimizer.zero_grad()
+	return classification
+
 def apply_model(dataCenter, ds, graphSage, classification, unsupervised_loss, b_sz, device, learn_method, last_epoch):
 	test_nodes = getattr(dataCenter, ds+'_test')
 	val_nodes = getattr(dataCenter, ds+'_val')
@@ -60,7 +90,6 @@ def apply_model(dataCenter, ds, graphSage, classification, unsupervised_loss, b_
 			if param.requires_grad:
 				params.append(param)
 
-	c_optimizer = torch.optim.SGD(classification.parameters(), lr=0.7)
 	optimizer = torch.optim.SGD(params, lr=0.7)
 	optimizer.zero_grad()
 	for model in models:
@@ -112,19 +141,20 @@ def apply_model(dataCenter, ds, graphSage, classification, unsupervised_loss, b_
 		for model in models:
 			model.zero_grad()
 
-		if learn_method == 'unsup':
-			# train classification, detached from the current graph
-			for k in range(10):
-				logists = classification(embs_batch.detach())
-				loss_sup = -torch.sum(logists[range(logists.size(0)), labels_batch], 0)
-				loss_sup /= len(nodes_batch)
-				loss_sup.backward()
-				nn.utils.clip_grad_norm_(classification.parameters(), 5)
-				c_optimizer.step()
-				c_optimizer.zero_grad()
+		# if learn_method == 'unsup':
+		# 	# train classification, detached from the current graph
+		# 	classification.init_params()
+		# 	for k in range(100):
+		# 		logists = classification(embs_batch.detach())
+		# 		loss_sup = -torch.sum(logists[range(logists.size(0)), labels_batch], 0)
+		# 		loss_sup /= len(nodes_batch)
+		# 		loss_sup.backward()
+		# 		nn.utils.clip_grad_norm_(classification.parameters(), 5)
+		# 		c_optimizer.step()
+		# 		c_optimizer.zero_grad()
 
 		if visited_nodes == set(train_nodes):
-			return
+			return graphSage, classification
 
 
 # def run_cora(device, dataCenter, data):

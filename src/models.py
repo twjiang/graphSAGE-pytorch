@@ -10,16 +10,37 @@ class Classification(nn.Module):
 	def __init__(self, emb_size, num_classes):
 		super(Classification, self).__init__()
 
-		self.weight = nn.Parameter(torch.FloatTensor(emb_size, num_classes))
+		#self.weight = nn.Parameter(torch.FloatTensor(emb_size, num_classes))
+		self.layer = nn.Sequential(
+								nn.Linear(emb_size, num_classes)	  
+								#nn.ReLU()
+							)
 		self.init_params()
 
 	def init_params(self):
 		for param in self.parameters():
-			nn.init.xavier_uniform_(param)
+			if len(param.size()) == 2:
+				nn.init.xavier_uniform_(param)
 
 	def forward(self, embeds):
-		logists = torch.log_softmax(torch.mm(embeds,self.weight), 1)
+		logists = torch.log_softmax(self.layer(embeds), 1)
 		return logists
+
+# class Classification(nn.Module):
+
+# 	def __init__(self, emb_size, num_classes):
+# 		super(Classification, self).__init__()
+
+# 		self.weight = nn.Parameter(torch.FloatTensor(emb_size, num_classes))
+# 		self.init_params()
+
+# 	def init_params(self):
+# 		for param in self.parameters():
+# 			nn.init.xavier_uniform_(param)
+
+# 	def forward(self, embeds):
+# 		logists = torch.log_softmax(torch.mm(embeds,self.weight), 1)
+# 		return logists
 
 class UnsupervisedLoss(object):
 	"""docstring for UnsupervisedLoss"""
@@ -57,13 +78,13 @@ class UnsupervisedLoss(object):
 			node_index = [node2index[x] for x in indexs[0]]
 			neighb_index = [node2index[x] for x in indexs[1]]
 			pos_score = F.cosine_similarity(embeddings[node_index], embeddings[neighb_index])
-			pos_score, _ = torch.min(torch.sigmoid(pos_score), 0)
+			pos_score, _ = torch.min(torch.log(torch.sigmoid(pos_score)), 0)
 
 			indexs = [list(x) for x in zip(*nps)]
 			node_index = [node2index[x] for x in indexs[0]]
 			neighb_index = [node2index[x] for x in indexs[1]]
 			neg_score = F.cosine_similarity(embeddings[node_index], embeddings[neighb_index])
-			neg_score, _ = torch.max(torch.sigmoid(neg_score), 0)
+			neg_score, _ = torch.max(torch.log(torch.sigmoid(neg_score)), 0)
 
 			nodes_score.append(torch.max(torch.tensor(0.0).to(self.device), neg_score-pos_score+self.MARGIN).view(1,-1))
 
