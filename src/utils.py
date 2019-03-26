@@ -77,7 +77,7 @@ def train_classification(dataCenter, graphSage, classification, ds, device, epoc
 		evaluate(dataCenter, ds, graphSage, classification, device)
 	return classification
 
-def apply_model(dataCenter, ds, graphSage, classification, unsupervised_loss, b_sz, device, learn_method):
+def apply_model(dataCenter, ds, graphSage, classification, unsupervised_loss, b_sz, num_neg, device, learn_method):
 	test_nodes = getattr(dataCenter, ds+'_test')
 	val_nodes = getattr(dataCenter, ds+'_val')
 	train_nodes = getattr(dataCenter, ds+'_train')
@@ -105,7 +105,7 @@ def apply_model(dataCenter, ds, graphSage, classification, unsupervised_loss, b_
 
 		# extend nodes batch for unspervised learning
 		# no conflicts with supervised learning
-		nodes_batch = np.asarray(list(unsupervised_loss.extend_nodes(nodes_batch)))
+		nodes_batch = np.asarray(list(unsupervised_loss.extend_nodes(nodes_batch, num_neg=num_neg)))
 		visited_nodes |= set(nodes_batch)
 
 		# get ground-truth for the nodes batch
@@ -127,10 +127,10 @@ def apply_model(dataCenter, ds, graphSage, classification, unsupervised_loss, b_
 			loss_sup = -torch.sum(logists[range(logists.size(0)), labels_batch], 0)
 			loss_sup /= len(nodes_batch)
 			# unsuperivsed learning
-			loss_net = unsupervised_loss.get_loss(embs_batch, nodes_batch)
+			loss_net = unsupervised_loss.get_loss_sage(embs_batch, nodes_batch)
 			loss = loss_sup + loss_net
 		else:
-			loss_net = unsupervised_loss.get_loss(embs_batch, nodes_batch)
+			loss_net = unsupervised_loss.get_loss_sage(embs_batch, nodes_batch)
 			loss = loss_net
 
 		print('Step [{}/{}], Loss: {:.4f}, Dealed Nodes [{}/{}] '.format(index, batches, loss.item(), len(visited_nodes), len(train_nodes)))
@@ -155,8 +155,8 @@ def apply_model(dataCenter, ds, graphSage, classification, unsupervised_loss, b_
 		# 		c_optimizer.step()
 		# 		c_optimizer.zero_grad()
 
-		if visited_nodes == set(train_nodes):
-			return graphSage, classification
+		#if visited_nodes == set(train_nodes):
+	return graphSage, classification
 
 
 # def run_cora(device, dataCenter, data):

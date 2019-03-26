@@ -46,6 +46,7 @@ class UnsupervisedLoss(object):
 	"""docstring for UnsupervisedLoss"""
 	def __init__(self, adj_lists, train_nodes, device):
 		super(UnsupervisedLoss, self).__init__()
+		self.Q = 10
 		self.N_WALKS = 6
 		self.WALK_LEN = 1
 		self.N_WALK_LEN = 5
@@ -61,7 +62,42 @@ class UnsupervisedLoss(object):
 		self.node_negtive_pairs = {}
 		self.unique_nodes_batch = []
 
-	def get_loss(self, embeddings, nodes):
+	def get_loss_sage(self, embeddings, nodes):
+		assert len(embeddings) == len(self.unique_nodes_batch)
+		assert False not in [nodes[i]==self.unique_nodes_batch[i] for i in range(len(nodes))]
+		node2index = {n:i for i,n in enumerate(self.unique_nodes_batch)}
+
+		nodes_score = []
+		assert len(self.node_positive_pairs) == len(self.node_negtive_pairs)
+		for node in self.node_positive_pairs:
+			pps = self.node_positive_pairs[node]
+			nps = self.node_negtive_pairs[node]
+			if len(pps) == 0 or len(nps) == 0:
+				continue
+
+			# Q * Exception(negative score)
+			indexs = [list(x) for x in zip(*nps)]
+			node_indexs = [node2index[x] for x in indexs[0]]
+			neighb_indexs = [node2index[x] for x in indexs[1]]
+			neg_score = F.cosine_similarity(embeddings[node_indexs], embeddings[neighb_indexs])
+			neg_score = self.Q*torch.mean(torch.log(torch.sigmoid(-neg_score)), 0)
+			#print(neg_score)
+
+			# multiple positive score
+			indexs = [list(x) for x in zip(*pps)]
+			node_indexs = [node2index[x] for x in indexs[0]]
+			neighb_indexs = [node2index[x] for x in indexs[1]]
+			pos_score = F.cosine_similarity(embeddings[node_indexs], embeddings[neighb_indexs])
+			pos_score = torch.log(torch.sigmoid(pos_score))
+			#print(pos_score)
+
+			nodes_score.append(torch.mean(- pos_score - neg_score).view(1,-1))
+				
+		loss = torch.mean(torch.cat(nodes_score, 0))
+		
+		return loss
+
+	def get_loss_margin(self, embeddings, nodes):
 		assert len(embeddings) == len(self.unique_nodes_batch)
 		assert False not in [nodes[i]==self.unique_nodes_batch[i] for i in range(len(nodes))]
 		node2index = {n:i for i,n in enumerate(self.unique_nodes_batch)}
@@ -75,15 +111,15 @@ class UnsupervisedLoss(object):
 				continue
 
 			indexs = [list(x) for x in zip(*pps)]
-			node_index = [node2index[x] for x in indexs[0]]
-			neighb_index = [node2index[x] for x in indexs[1]]
-			pos_score = F.cosine_similarity(embeddings[node_index], embeddings[neighb_index])
+			node_indexs = [node2index[x] for x in indexs[0]]
+			neighb_indexs = [node2index[x] for x in indexs[1]]
+			pos_score = F.cosine_similarity(embeddings[node_indexs], embeddings[neighb_indexs])
 			pos_score, _ = torch.min(torch.log(torch.sigmoid(pos_score)), 0)
 
 			indexs = [list(x) for x in zip(*nps)]
-			node_index = [node2index[x] for x in indexs[0]]
-			neighb_index = [node2index[x] for x in indexs[1]]
-			neg_score = F.cosine_similarity(embeddings[node_index], embeddings[neighb_index])
+			node_indexs = [node2index[x] for x in indexs[0]]
+			neighb_indexs = [node2index[x] for x in indexs[1]]
+			neg_score = F.cosine_similarity(embeddings[node_indexs], embeddings[neighb_indexs])
 			neg_score, _ = torch.max(torch.log(torch.sigmoid(neg_score)), 0)
 
 			nodes_score.append(torch.max(torch.tensor(0.0).to(self.device), neg_score-pos_score+self.MARGIN).view(1,-1))
@@ -96,7 +132,7 @@ class UnsupervisedLoss(object):
 		return loss
 
 
-	def extend_nodes(self, nodes):
+	def extend_nodes(self, nodes, num_neg=6):
 		self.positive_pairs = []
 		self.node_positive_pairs = {}
 		self.negtive_pairs = []
@@ -105,7 +141,7 @@ class UnsupervisedLoss(object):
 		self.target_nodes = nodes
 		self.get_positive_nodes(nodes)
 		# print(self.positive_pairs)
-		self.get_negtive_nodes(nodes)
+		self.get_negtive_nodes(nodes, num_neg)
 		# print(self.negtive_pairs)
 		self.unique_nodes_batch = list(set([i for x in self.positive_pairs for i in x]) | set([i for x in self.negtive_pairs for i in x]))
 		assert set(self.target_nodes) < set(self.unique_nodes_batch)
@@ -114,7 +150,7 @@ class UnsupervisedLoss(object):
 	def get_positive_nodes(self, nodes):
 		return self._run_random_walks(nodes)
 
-	def get_negtive_nodes(self, nodes):
+	def get_negtive_nodes(self, nodes, num_neg):
 		for node in nodes:
 			neighbors = set([node])
 			frontier = set([node])
@@ -125,7 +161,7 @@ class UnsupervisedLoss(object):
 				frontier = current - neighbors
 				neighbors |= current
 			far_nodes = set(self.train_nodes) - neighbors
-			neg_samples = random.sample(far_nodes, self.N_WALKS*self.WALK_LEN) if self.N_WALKS*self.WALK_LEN < len(far_nodes) else far_nodes
+			neg_samples = random.sample(far_nodes, num_neg) if num_neg < len(far_nodes) else far_nodes
 			self.negtive_pairs.extend([(node, neg_node) for neg_node in neg_samples])
 			self.node_negtive_pairs[node] = [(node, neg_node) for neg_node in neg_samples]
 		return self.negtive_pairs

@@ -16,6 +16,7 @@ parser.add_argument('--agg_func', type=str, default='MEAN')
 parser.add_argument('--epochs', type=int, default=200)
 parser.add_argument('--b_sz', type=int, default=20)
 parser.add_argument('--seed', type=int, default=824)
+parser.add_argument('--num_neg', type=int, default=100)
 parser.add_argument('--cuda', action='store_true',
 					help='use CUDA')
 parser.add_argument('--gcn', action='store_true')
@@ -66,9 +67,9 @@ if __name__ == '__main__':
 
 	for epoch in range(args.epochs):
 		print('----------------------EPOCH %d-----------------------' % epoch)
-		graphSage, classification = apply_model(dataCenter, ds, graphSage, classification, unsupervised_loss, args.b_sz, device, args.learn_method)
+		graphSage, classification = apply_model(dataCenter, ds, graphSage, classification, unsupervised_loss, args.b_sz, args.num_neg, device, args.learn_method)
 		if (epoch+1) % 2 == 0 and args.learn_method == 'unsup':
 		 	classification = train_classification(dataCenter, graphSage, classification, ds, device)
-		#evaluate(dataCenter, ds, graphSage, classification, device)
+		evaluate(dataCenter, ds, graphSage, classification, device)
 
 
