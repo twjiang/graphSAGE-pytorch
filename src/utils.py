@@ -66,7 +66,7 @@ def train_classification(dataCenter, graphSage, classification, ds, device, epoc
 			logists = classification(embs_batch)
 			loss = -torch.sum(logists[range(logists.size(0)), labels_batch], 0)
 			loss /= len(nodes_batch)
-			print('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}, Dealed Nodes [{}/{}] '.format(epoch, epochs, index, batches, loss.item(), len(visited_nodes), len(train_nodes)))
+			print('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}, Dealed Nodes [{}/{}] '.format(epoch+1, epochs, index, batches, loss.item(), len(visited_nodes), len(train_nodes)))
 
 			loss.backward()
 			
@@ -77,11 +77,19 @@ def train_classification(dataCenter, graphSage, classification, ds, device, epoc
 		evaluate(dataCenter, ds, graphSage, classification, device)
 	return classification
 
-def apply_model(dataCenter, ds, graphSage, classification, unsupervised_loss, b_sz, num_neg, device, learn_method):
+def apply_model(dataCenter, ds, graphSage, classification, unsupervised_loss, b_sz, unsup_loss, device, learn_method):
 	test_nodes = getattr(dataCenter, ds+'_test')
 	val_nodes = getattr(dataCenter, ds+'_val')
 	train_nodes = getattr(dataCenter, ds+'_train')
 	labels = getattr(dataCenter, ds+'_labels')
+
+	if unsup_loss == 'margin':
+		num_neg = 6
+	elif unsup_loss == 'normal':
+		num_neg = 100
+	else:
+		print("unsup_loss can be only 'margin' or 'normal'.")
+		sys.exit(1)
 
 	train_nodes = shuffle(train_nodes)
 
@@ -127,13 +135,19 @@ def apply_model(dataCenter, ds, graphSage, classification, unsupervised_loss, b_
 			loss_sup = -torch.sum(logists[range(logists.size(0)), labels_batch], 0)
 			loss_sup /= len(nodes_batch)
 			# unsuperivsed learning
-			loss_net = unsupervised_loss.get_loss_sage(embs_batch, nodes_batch)
+			if unsup_loss == 'margin':
+				loss_net = unsupervised_loss.get_loss_margin(embs_batch, nodes_batch)
+			elif unsup_loss == 'normal':
+				loss_net = unsupervised_loss.get_loss_sage(embs_batch, nodes_batch)
 			loss = loss_sup + loss_net
 		else:
-			loss_net = unsupervised_loss.get_loss_sage(embs_batch, nodes_batch)
+			if unsup_loss == 'margin':
+				loss_net = unsupervised_loss.get_loss_margin(embs_batch, nodes_batch)
+			elif unsup_loss == 'normal':
+				loss_net = unsupervised_loss.get_loss_sage(embs_batch, nodes_batch)
 			loss = loss_net
 
-		print('Step [{}/{}], Loss: {:.4f}, Dealed Nodes [{}/{}] '.format(index, batches, loss.item(), len(visited_nodes), len(train_nodes)))
+		print('Step [{}/{}], Loss: {:.4f}, Dealed Nodes [{}/{}] '.format(index+1, batches, loss.item(), len(visited_nodes), len(train_nodes)))
 		loss.backward()
 		for model in models:
 			nn.utils.clip_grad_norm_(model.parameters(), 5)
@@ -143,60 +157,4 @@ def apply_model(dataCenter, ds, graphSage, classification, unsupervised_loss, b_
 		for model in models:
 			model.zero_grad()
 
-		# if learn_method == 'unsup':
-		# 	# train classification, detached from the current graph
-		# 	classification.init_params()
-		# 	for k in range(100):
-		# 		logists = classification(embs_batch.detach())
-		# 		loss_sup = -torch.sum(logists[range(logists.size(0)), labels_batch], 0)
-		# 		loss_sup /= len(nodes_batch)
-		# 		loss_sup.backward()
-		# 		nn.utils.clip_grad_norm_(classification.parameters(), 5)
-		# 		c_optimizer.step()
-		# 		c_optimizer.zero_grad()
-
-		#if visited_nodes == set(train_nodes):
 	return graphSage, classification
-
-
-# def run_cora(device, dataCenter, data):
-# 	feat_data, labels, adj_lists = data
-# 	test_indexs, val_indexs, train_indexs = split_data(feat_data.size(0))
-
-# 	features = torch.FloatTensor(feat_data).to(device)
-# 	print(feat_data.size())
-
-	# agg_enc1 = Aggregator_Encoder(features, features.size(0), dataCenter.config['setting.hidden_emb_size'], adj_lists)
-	# agg_enc1.to(device)
-	# h1 = agg_enc1(nodes)
-	# agg2 = MeanAggregator(lambda nodes : enc1(nodes).t())
-	# enc2 = Encoder(lambda nodes : enc1(nodes).t(), enc1.embed_dim, 128, adj_lists, agg2, base_model=enc1)
-
-# 	enc1.num_samples = 5
-# 	enc2.num_samples = 5
-
-# 	graphsage = SupervisedGraphSage(7, enc2)
-# #	graphsage.cuda()
-# 	rand_indices = np.random.permutation(num_nodes)
-# 	test = rand_indices[:1000]
-# 	val = rand_indices[1000:1500]
-# 	train = list(rand_indices[1500:])
-
-# 	optimizer = torch.optim.SGD(filter(lambda p : p.requires_grad, graphsage.parameters()), lr=0.7)
-# 	times = []
-# 	for batch in range(100):
-# 		batch_nodes = train[:256]
-# 		random.shuffle(train)
-# 		start_time = time.time()
-# 		optimizer.zero_grad()
-# 		loss = graphsage.loss(batch_nodes, 
-# 				Variable(torch.LongTensor(labels[np.array(batch_nodes)])))
-# 		loss.backward()
-# 		optimizer.step()
-# 		end_time = time.time()
-# 		times.append(end_time-start_time)
-# 		print batch, loss.data[0]
-
-# 	val_output = graphsage.forward(val) 
-# 	print "Validation F1:", f1_score(labels[val], val_output.data.numpy().argmax(axis=1), average="micro")
-# 	print "Average batch time:", np.mean(times)

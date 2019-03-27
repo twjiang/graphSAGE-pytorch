@@ -22,22 +22,22 @@ This package contains a PyTorch implementation of [GraphSAGE](http://snap.stanfo
 ```
 --dataSet     The input graph dataset. (default: cora)
 --agg_func    The aggregate function. (default: Mean aggregater)
---epochs      Number of epochs. (default: 200)
+--epochs      Number of epochs. (default: 50)
 --b_sz        Batch size. (default: 20)
 --seed        Random seed. (default: 824)
---num_neg     Number of negative samples in each batch. (default: 100)
+--unsup_loss  The loss function for unsupervised learning. ('margin' or 'normal', default: normal)
 --config      Config file. (default: ./src/experiments.conf)
---cuda        Use cuda if declared.
+--cuda        Use GPU if declared.
 ```
 
-**Loss function**
+**Learning Method**
 
-The user must specify a loss function by --learn_method, ...
+The user must specify a learning method by --learn_method, 'sup' is for supervised learning, 'unsup' is for unsupervised learning, and 'plus_unsup' is for jointly learning the loss of supervised and unsupervised method.
 
 **Example Usage**
 
 To run the unsupervised model on Cuda:
 ```
-python -m src.main --epochs 100 --cuda --learn_method unsup
+python -m src.main --epochs 50 --cuda --learn_method unsup
 ```
 

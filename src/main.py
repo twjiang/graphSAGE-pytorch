@@ -13,14 +13,14 @@ parser = argparse.ArgumentParser(description='pytorch version of GraphSAGE')
 
 parser.add_argument('--dataSet', type=str, default='cora')
 parser.add_argument('--agg_func', type=str, default='MEAN')
-parser.add_argument('--epochs', type=int, default=200)
+parser.add_argument('--epochs', type=int, default=50)
 parser.add_argument('--b_sz', type=int, default=20)
 parser.add_argument('--seed', type=int, default=824)
-parser.add_argument('--num_neg', type=int, default=100)
 parser.add_argument('--cuda', action='store_true',
 					help='use CUDA')
 parser.add_argument('--gcn', action='store_true')
 parser.add_argument('--learn_method', type=str, default='sup')
+parser.add_argument('--unsup_loss', type=str, default='normal')
 parser.add_argument('--config', type=str, default='./src/experiments.conf')
 args = parser.parse_args()
 
@@ -67,7 +67,7 @@ if __name__ == '__main__':
 
 	for epoch in range(args.epochs):
 		print('----------------------EPOCH %d-----------------------' % epoch)
-		graphSage, classification = apply_model(dataCenter, ds, graphSage, classification, unsupervised_loss, args.b_sz, args.num_neg, device, args.learn_method)
+		graphSage, classification = apply_model(dataCenter, ds, graphSage, classification, unsupervised_loss, args.b_sz, args.unsup_loss, device, args.learn_method)
 		if (epoch+1) % 2 == 0 and args.learn_method == 'unsup':
 		 	classification = train_classification(dataCenter, graphSage, classification, ds, device)
 		evaluate(dataCenter, ds, graphSage, classification, device)
