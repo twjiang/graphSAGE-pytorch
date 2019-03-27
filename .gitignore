@@ -1,4 +1,7 @@
+# ignore .torch files
 *.torch
+
+# ignore logs folder
 logs/
 
 # Byte-compiled / optimized / DLL files
