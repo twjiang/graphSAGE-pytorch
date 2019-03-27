@@ -30,6 +30,12 @@ This package contains a PyTorch implementation of [GraphSAGE](http://snap.stanfo
 --cuda        Use cuda if declared.
 ```
 
-**Usage**
+**Loss function**
+The user must specify a loss function by --learn_method, ...
 
+**Example Usage**
+To run the unsupervised model on Cuda:
+```
+python -m src.main --epochs 100 --cuda --learn_method unsup
+```
 
