@@ -32,7 +32,7 @@ This package contains a PyTorch implementation of [GraphSAGE](http://snap.stanfo
 
 **Learning Method**
 
-The user must specify a learning method by --learn_method, 'sup' is for supervised learning, 'unsup' is for unsupervised learning, and 'plus_unsup' is for jointly learning the loss of supervised and unsupervised method.
+The user can specify a learning method by --learn_method, 'sup' is for supervised learning, 'unsup' is for unsupervised learning, and 'plus_unsup' is for jointly learning the loss of supervised and unsupervised method.
 
 **Example Usage**
 
