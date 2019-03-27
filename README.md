@@ -2,7 +2,7 @@
 
 This package contains a PyTorch implementation of [GraphSAGE](http://snap.stanford.edu/graphsage/).
 
-#### Authors of this code package: [Tianwen Jiang](http://ir.hit.edu.cn/~twjiang/) (tjiang2@nd.edu), [Tong Zhao](tong-zhao.com) (tzhao2@nd.edu).
+#### Authors of this code package: [Tianwen Jiang](http://ir.hit.edu.cn/~twjiang/) (tjiang2@nd.edu), [Tong Zhao](zhao-tong.com) (tzhao2@nd.edu).
 
 
 
