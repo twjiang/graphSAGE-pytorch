@@ -10,7 +10,7 @@ from sklearn.metrics import f1_score
 import torch.nn as nn
 import numpy as np
 
-def evaluate(dataCenter, ds, graphSage, classification, device, max_vali_f1, name):
+def evaluate(dataCenter, ds, graphSage, classification, device, max_vali_f1, name, cur_epoch):
 	test_nodes = getattr(dataCenter, ds+'_test')
 	val_nodes = getattr(dataCenter, ds+'_val')
 	labels = getattr(dataCenter, ds+'_labels')
@@ -49,7 +49,7 @@ def evaluate(dataCenter, ds, graphSage, classification, device, max_vali_f1, nam
 		for param in params:
 			param.requires_grad = True
 
-		torch.save(models, 'models/model_best_{}.torch'.format(name))
+		torch.save(models, 'models/model_best_{}_ep{}_{:.4f}.torch'.format(name, cur_epoch, test_f1))
 
 	for param in params:
 		param.requires_grad = True
@@ -85,7 +85,7 @@ def train_classification(dataCenter, graphSage, classification, ds, device, max_
 			c_optimizer.step()
 			c_optimizer.zero_grad()
 
-		max_vali_f1 = evaluate(dataCenter, ds, graphSage, classification, device, max_vali_f1, name)
+		max_vali_f1 = evaluate(dataCenter, ds, graphSage, classification, device, max_vali_f1, name, epoch)
 	return classification, max_vali_f1
 
 def apply_model(dataCenter, ds, graphSage, classification, unsupervised_loss, b_sz, unsup_loss, device, learn_method):
