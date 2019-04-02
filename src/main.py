@@ -21,6 +21,8 @@ parser.add_argument('--cuda', action='store_true',
 parser.add_argument('--gcn', action='store_true')
 parser.add_argument('--learn_method', type=str, default='sup')
 parser.add_argument('--unsup_loss', type=str, default='normal')
+parser.add_argument('--max_vali_f1', type=float, default=0)
+parser.add_argument('--name', type=str, default='debug')
 parser.add_argument('--config', type=str, default='./src/experiments.conf')
 args = parser.parse_args()
 
@@ -69,7 +71,5 @@ if __name__ == '__main__':
 		print('----------------------EPOCH %d-----------------------' % epoch)
 		graphSage, classification = apply_model(dataCenter, ds, graphSage, classification, unsupervised_loss, args.b_sz, args.unsup_loss, device, args.learn_method)
 		if (epoch+1) % 2 == 0 and args.learn_method == 'unsup':
-		 	classification = train_classification(dataCenter, graphSage, classification, ds, device)
-		evaluate(dataCenter, ds, graphSage, classification, device)
-
-
+			classification, args.max_vali_f1 = train_classification(dataCenter, graphSage, classification, ds, device, args.max_vali_f1, args.name)
+		args.max_vali_f1 = evaluate(dataCenter, ds, graphSage, classification, device, args.max_vali_f1, args.name)

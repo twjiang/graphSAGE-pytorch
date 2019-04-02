@@ -10,7 +10,7 @@ from sklearn.metrics import f1_score
 import torch.nn as nn
 import numpy as np
 
-def evaluate(dataCenter, ds, graphSage, classification, device):
+def evaluate(dataCenter, ds, graphSage, classification, device, max_vali_f1, name):
 	test_nodes = getattr(dataCenter, ds+'_test')
 	val_nodes = getattr(dataCenter, ds+'_val')
 	labels = getattr(dataCenter, ds+'_labels')
@@ -31,21 +31,32 @@ def evaluate(dataCenter, ds, graphSage, classification, device):
 	assert len(labels_val) == len(predicts)
 	comps = zip(labels_val, predicts.data)
 
-	print("Validation F1:", f1_score(labels_val, predicts.cpu().data, average="micro"))
+	vali_f1 = f1_score(labels_val, predicts.cpu().data, average="micro")
+	print("Validation F1:", vali_f1)
 
-	embs = graphSage(test_nodes)
-	logists = classification(embs)
-	_, predicts = torch.max(logists, 1)
-	labels_test = labels[test_nodes]
-	assert len(labels_test) == len(predicts)
-	comps = zip(labels_test, predicts.data)
+	if vali_f1 > max_vali_f1:
+		max_vali_f1 = vali_f1
+		embs = graphSage(test_nodes)
+		logists = classification(embs)
+		_, predicts = torch.max(logists, 1)
+		labels_test = labels[test_nodes]
+		assert len(labels_test) == len(predicts)
+		comps = zip(labels_test, predicts.data)
 
-	print("Test F1:", f1_score(labels_test, predicts.cpu().data, average="micro"))
+		test_f1 = f1_score(labels_test, predicts.cpu().data, average="micro")
+		print("Test F1:", test_f1)
+
+		for param in params:
+			param.requires_grad = True
+
+		torch.save(models, 'models/model_best_{}.torch'.format(name))
 
 	for param in params:
 		param.requires_grad = True
 
-def train_classification(dataCenter, graphSage, classification, ds, device, epochs=800):
+	return max_vali_f1
+
+def train_classification(dataCenter, graphSage, classification, ds, device, max_vali_f1, name, epochs=800):
 	print('Training Classification ...')
 	c_optimizer = torch.optim.SGD(classification.parameters(), lr=0.5)
 	# train classification, detached from the current graph
@@ -74,8 +85,8 @@ def train_classification(dataCenter, graphSage, classification, ds, device, epoc
 			c_optimizer.step()
 			c_optimizer.zero_grad()
 
-		evaluate(dataCenter, ds, graphSage, classification, device)
-	return classification
+		max_vali_f1 = evaluate(dataCenter, ds, graphSage, classification, device, max_vali_f1, name)
+	return classification, max_vali_f1
 
 def apply_model(dataCenter, ds, graphSage, classification, unsupervised_loss, b_sz, unsup_loss, device, learn_method):
 	test_nodes = getattr(dataCenter, ds+'_test')
