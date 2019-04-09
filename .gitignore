@@ -1,8 +1,9 @@
 # ignore .torch files
 *.torch
 
-# ignore logs folder
+# ignore logs and models folders
 logs/
+models/
 
 # Byte-compiled / optimized / DLL files
 src/__pycache__/
