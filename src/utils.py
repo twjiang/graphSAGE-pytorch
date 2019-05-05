@@ -56,15 +56,37 @@ def evaluate(dataCenter, ds, graphSage, classification, device, max_vali_f1, nam
 
 	return max_vali_f1
 
+def get_gnn_embeddings(gnn_model, dataCenter, ds):
+    print('Loading embeddings from trained GraphSAGE model.')
+    features = np.zeros((len(getattr(dataCenter, ds+'_labels')), gnn_model.out_size))
+    nodes = np.arange(len(getattr(dataCenter, ds+'_labels'))).tolist()
+    b_sz = 500
+    batches = math.ceil(len(nodes) / b_sz)
+    embs = []
+    for index in range(batches):
+        nodes_batch = nodes[index*b_sz:(index+1)*b_sz]
+        embs_batch = gnn_model(nodes_batch)
+        assert len(embs_batch) == len(nodes_batch)
+        embs.append(embs_batch)
+        # if ((index+1)*b_sz) % 10000 == 0:
+        #     print(f'Dealed Nodes [{(index+1)*b_sz}/{len(nodes)}]')
+
+    assert len(embs) == batches
+    embs = torch.cat(embs, 0)
+    assert len(embs) == len(nodes)
+    print('Embeddings loaded.')
+    return embs.detach()
+
 def train_classification(dataCenter, graphSage, classification, ds, device, max_vali_f1, name, epochs=800):
 	print('Training Classification ...')
 	c_optimizer = torch.optim.SGD(classification.parameters(), lr=0.5)
 	# train classification, detached from the current graph
 	#classification.init_params()
 	b_sz = 50
+	train_nodes = getattr(dataCenter, ds+'_train')
+	labels = getattr(dataCenter, ds+'_labels')
+	features = get_gnn_embeddings(graphSage, dataCenter, ds)
 	for epoch in range(epochs):
-		train_nodes = getattr(dataCenter, ds+'_train')
-		labels = getattr(dataCenter, ds+'_labels')
 		train_nodes = shuffle(train_nodes)
 		batches = math.ceil(len(train_nodes) / b_sz)
 		visited_nodes = set()
@@ -72,12 +94,12 @@ def train_classification(dataCenter, graphSage, classification, ds, device, max_
 			nodes_batch = train_nodes[index*b_sz:(index+1)*b_sz]
 			visited_nodes |= set(nodes_batch)
 			labels_batch = labels[nodes_batch]
-			embs_batch = graphSage(nodes_batch)
+			embs_batch = features[nodes_batch]
 
 			logists = classification(embs_batch)
 			loss = -torch.sum(logists[range(logists.size(0)), labels_batch], 0)
 			loss /= len(nodes_batch)
-			print('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}, Dealed Nodes [{}/{}] '.format(epoch+1, epochs, index, batches, loss.item(), len(visited_nodes), len(train_nodes)))
+			# print('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}, Dealed Nodes [{}/{}] '.format(epoch+1, epochs, index, batches, loss.item(), len(visited_nodes), len(train_nodes)))
 
 			loss.backward()
 			
