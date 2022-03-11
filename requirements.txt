@@ -1,5 +1,5 @@
 numpy==1.16.2
-Pillow==8.3.2
+Pillow==9.0.1
 pyhocon==0.3.51
 pyparsing==2.3.1
 scikit-learn==0.20.3
