@@ -3,7 +3,7 @@ Pillow==8.3.2
 pyhocon==0.3.51
 pyparsing==2.3.1
 scikit-learn==0.20.3
-scipy==1.2.1
+scipy==1.10.0
 six==1.12.0
 sklearn==0.0
 torch==1.0.1.post2
